@@ -1,0 +1,26 @@
+# Core pipeline
+networkx>=3.0
+pyyaml>=6.0
+
+# Phase 1 (Memory Artifact Extraction) -- required only for real
+# memory-image analysis; not needed to run tests against the mock
+# fixture in tests/fixtures/.
+volatility3>=2.5.0
+
+# Phase 5/6 (LLM-Assisted Reasoning) -- pick the provider(s) you use.
+# AnthropicProvider (paid, no free tier):
+anthropic>=0.30.0
+# GroqProvider (free tier, no card required, OpenAI-compatible API):
+openai>=1.0.0
+# OllamaProvider (fully local, free, private -- requires Ollama running
+# locally, see https://ollama.com):
+requests>=2.31.0
+# GeminiProvider alternative: google-genai>=0.3.0
+
+# Development / testing
+pytest>=7.0
+
+# Convenience: load API keys from a .env file instead of exporting
+# them in every shell session (see .env.example). Optional -- the
+# pipeline works fine without it if you export env vars directly.
+python-dotenv>=1.0.0

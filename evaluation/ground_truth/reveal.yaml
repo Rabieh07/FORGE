@@ -1,0 +1,35 @@
+# Ground truth for RQ1 (recall only -- see redline.yaml's header comment
+# for the same methodology note).
+#
+# Source: https://medium.com/@chaoskist/cyberdefenders-write-up-reveal-3a318ca0f603
+# (CyberDefenders "Reveal" challenge writeup)
+
+image_name: "Reveal (CyberDefenders)"
+source_url: "https://medium.com/@chaoskist/cyberdefenders-write-up-reveal-3a318ca0f603"
+malware_family: "StrelaStealer"
+
+items:
+  - description: "PowerShell mounts a remote WebDAV share and executes a DLL from it via rundll32"
+    process_name: "powershell.exe"
+    process_pid: 3692  # per FORGE's own consistent numbering of this image across all runs this session
+    expected_behavior: "Execution"
+    mitre_technique: "T1218.011"  # Signed Binary Proxy Execution: Rundll32 -- confirmed by writeup Q5
+    notes: >
+      Writeup confirms: malicious process is powershell.exe (Q1);
+      second-stage payload is 3435.dll (Q3); shared directory is
+      davwwwroot (Q4); technique is T1218.011 (Q5). FORGE's
+      webdav_rundll32_remote_execution rule was written to directly
+      match this pattern and independently reproduced the exact
+      filename and directory name.
+
+  - description: "Malicious process runs under a specific compromised user account"
+    process_name: "powershell.exe"
+    process_pid: 3692
+    expected_behavior: null  # FORGE has no session/username plugin wired up at all
+    mitre_technique: null
+    notes: >
+      Writeup confirms the process ran under username "Elon" (Q6, via
+      windows.sessions.Sessions). FORGE does not currently normalize
+      any session/user-context plugin, so this item is expected to be
+      UNDETECTED -- included as a known, out-of-scope gap rather than
+      silently omitted from the ground truth.

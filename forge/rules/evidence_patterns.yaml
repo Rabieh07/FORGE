@@ -1,0 +1,254 @@
+# Forensic Behavior Ontology (FBO) evidence-pattern library.
+#
+# Each rule matches a single Layer-1 relationship (an edge in the
+# knowledge graph) against a set of conditions on the edge type and
+# the attributes of its source/target artifacts, and maps a match to
+# a Layer-3 behavioral concept. This file is the auditable artifact
+# referenced in the paper (Section III.F) -- reviewers and future
+# users can see exactly what triggers each behavior label without
+# reading inference engine code.
+#
+# Matching semantics (see inference.py):
+#   edge_type            - required; the EdgeType this rule matches
+#   source_type          - optional; ArtifactType of the edge source
+#   target_type          - optional; ArtifactType of the edge target
+#   target_attr_patterns - optional; dict of {attribute: regex} that
+#                           must all match against the target artifact
+#   source_attr_patterns - optional; same, against the source artifact
+#   produces              - required; BehaviorConcept this rule yields
+#   confidence            - required; float in [0, 1]
+#   description           - required; human-readable explanation used
+#                           to populate InferredBehavior.explanation_path
+
+- id: persistence_run_key
+  edge_type: WRITES
+  target_type: RegistryKey
+  target_attr_patterns:
+    key_path: '.*\\Run$'
+  produces: Persistence
+  confidence: 0.85
+  description: >
+    A value is present in a registry Run-key autorun location, a
+    common persistence mechanism ensuring re-execution at logon/
+    startup. Source process attribution is currently synthetic/
+    unattributed (PrintKey provides no process linkage -- see
+    normalize_registry() in normalizer.py); this rule intentionally
+    does not check hive or source-process attributes for that reason.
+    A previous version of this file had a separate, higher-confidence
+    persistence_run_key_hkcu variant requiring hive == HKCU; it was
+    merged into this single rule because (a) that field was never
+    confirmed to exist in real PrintKey output, and (b) two rules
+    matching the same underlying evidence produced exactly the kind of
+    redundant Phase 4 output (duplicate behavior nodes for one real
+    finding) observed and flagged during real-image testing of the
+    Code Injection rules -- not worth reintroducing here pre-emptively.
+
+- id: c2_encoded_cmdline_and_connection
+  edge_type: CONNECTS_TO
+  target_type: Socket
+  source_attr_patterns:
+    command_line: '(?i)(-enc|-EncodedCommand|FromBase64String)'
+  produces: Command and Control
+  confidence: 0.85
+  description: >
+    Process has both an outbound connection (of any state -- see below)
+    and an encoded PowerShell command line, a combination strongly
+    associated with command-and-control beaconing. This is currently
+    the only C2 rule in the library -- a standalone "established
+    connection" rule was removed after real-image testing
+    (CyberDefenders "Brave" challenge) showed it fired on essentially
+    every process with any network activity (Windows Defender's
+    MsMpEng.exe, SearchApp.exe, browser processes) and every flagged
+    destination was ordinary Microsoft/Google/Azure telemetry or the
+    user's own legitimate mail provider, with zero true positives
+    observed. An established connection alone has no discriminating
+    power on a typical desktop image; requiring corroboration (here, an
+    encoded command line) is a floor, not a ceiling -- see paper
+    Limitations for further discussion of false positives and planned
+    corroborating signals (non-standard ports, IP reputation) for
+    future rules.
+
+    The earlier version of this rule additionally required
+    state == ESTABLISHED; removed after real-image testing
+    (CyberDefenders 106-redline, oneetx.exe/RedLine Stealer) showed the
+    one confirmed, ground-truth-verified C2 connection in this
+    codebase's testing had already closed by acquisition time
+    (state == CLOSED), meaning the ESTABLISHED-only version would never
+    have fired on the one real C2 case actually confirmed so far. A
+    connection having occurred, regardless of its state at acquisition
+    time, is still evidence.
+
+# --- RETIRED: code_injection_rwx_region -----------------------------
+# STATUS: inactive. Its data source (windows.vadinfo.VadInfo) is not
+# in NORMALIZED_PLUGINS (see volatility_adapter.py) as of the plugin
+# set narrowing described in the paper's Preliminary Real-World
+# Observations section, so this rule cannot currently match anything
+# in a real (non-mock) run -- it was found silently inert during a
+# later development pass, not intentionally disabled at the time
+# vadinfo was dropped. Rather than silently leave a rule that looks
+# active but structurally cannot fire, or resurrect vadinfo (which
+# would reintroduce the redundancy with code_injection_malfind_flagged
+# that motivated dropping it in the first place -- confirmed via
+# real-image testing that malfind's output overlapped ~78% with this
+# rule's matches, catching the same false positives plus most of the
+# same true positives), the rule is retired here, commented out but
+# preserved in full for anyone who wants to reactivate it (add
+# "vadinfo" back to NORMALIZED_PLUGINS and uncomment below).
+#
+# - id: code_injection_rwx_region
+#   edge_type: ALLOCATES
+#   target_type: MemoryRegion
+#   target_attr_patterns:
+#     protection: 'PAGE_EXECUTE_READWRITE'
+#     backing_file: '^(N/A|None|)$'
+#   produces: Code Injection
+#   confidence: 0.80
+#   description: >
+#     Process allocated an anonymous (unbacked) memory region with
+#     read-write-execute (RWX) protection -- i.e. executable memory not
+#     associated with any mapped file on disk -- a stronger indicator of
+#     shellcode staging or reflective code injection than RWX protection
+#     alone, which is also common in legitimate file-backed memory (e.g.
+#     JIT-compiled code, loaded modules). Confirmed via real-image testing
+#     to still produce false positives on processes that legitimately
+#     self-JIT (e.g. antivirus engines with internal scripting sandboxes);
+#     treat as necessary-but-not-sufficient evidence, not proof.
+# ----------------------------------------------------------------------
+
+- id: code_injection_malfind_flagged
+  edge_type: ALLOCATES
+  target_type: MemoryRegion
+  target_source_plugin: malfind
+  produces: Code Injection
+  confidence: 0.85
+  description: >
+    Volatility's windows.malware.malfind.Malfind plugin independently
+    flagged this memory region using its own internal heuristics --
+    unlike windows.vadinfo.VadInfo (which returns every VAD entry for
+    a process), malfind only returns entries it already considers
+    suspicious. A region appearing in malfind's output is therefore a
+    more specific, independently corroborating signal than
+    code_injection_rwx_region's broader RWX-plus-anonymous heuristic
+    alone. This remains a heuristic, not proof: malfind is well
+    documented in DFIR practice to still require analyst triage (see
+    the paper's Limitations section). Note: windows.malfind.Malfind
+    and windows.malware.malfind.Malfind are both separately registered
+    plugins in some Volatility 3 versions -- only the latter was
+    confirmed to produce real output when tested directly; see
+    DEFAULT_PLUGINS in volatility_adapter.py.
+
+- id: code_injection_malfind_pe_header
+  edge_type: ALLOCATES
+  target_type: MemoryRegion
+  target_source_plugin: malfind
+  target_attr_patterns:
+    notes: '(?i)MZ'
+  produces: Code Injection
+  confidence: 0.95
+  description: >
+    Volatility's malfind plugin detected an embedded PE (MZ) header
+    within an anonymous, malfind-flagged memory region -- a strong,
+    specific indicator of a fully-formed executable or DLL having
+    been manually mapped or unpacked into memory (e.g. reflective DLL
+    injection, process hollowing with a complete PE image), distinct
+    from "some anonymous executable memory" more generally, which
+    legitimate JIT engines also produce. Highest confidence among the
+    Code Injection rules in this library.
+
+    IMPORTANT LIMITATION: this signal will NOT fire on injection
+    techniques that never write a complete PE header into memory --
+    raw shellcode, or a loader/dropper that manually unpacks and
+    executes a second-stage payload without materializing a full PE
+    image (e.g. a DLL's exported entry point allocating and running
+    shellcode directly, rather than mapping another complete DLL).
+    Confirmed via a real image: a process independently confirmed
+    malicious via webdav_rundll32_remote_execution (command-line
+    evidence) had 5 malfind-flagged anonymous RWX regions, none of
+    which had an MZ header in their Notes field -- absence of this
+    signal is not evidence of absence, only evidence that this
+    specific technique was not used. See code_injection_malfind_flagged
+    and code_injection_rwx_region for broader, weaker-but-more-general
+    heuristics that would still catch such a case, and the paper's
+    Limitations section for further discussion.
+
+- id: process_spawned_from_temp
+  edge_type: SPAWNS
+  target_type: Process
+  target_attr_patterns:
+    path: '(?i)\\Temp\\'
+  produces: Defense Evasion
+  confidence: 0.5
+  description: >
+    A process was spawned from a Temp directory path, a common staging
+    location for dropped or downloaded malware -- e.g. confirmed via
+    a real image (CyberDefenders 106-redline) for a documented RedLine
+    Stealer dropper (oneetx.exe, path under
+    \Users\...\AppData\Local\Temp\...). Weak alone: legitimate
+    installers and browser downloads also stage in Temp, so this
+    is intended as a standalone low-confidence signal and a
+    corroborating condition for stronger rules (see
+    temp_dropper_with_malfind_injection), not a standalone detector of
+    malicious intent.
+
+- id: temp_dropper_with_malfind_injection
+  edge_type: ALLOCATES
+  source_type: Process
+  source_attr_patterns:
+    path: '(?i)\\Temp\\'
+  target_type: MemoryRegion
+  target_source_plugin: malfind
+  produces: Code Injection
+  confidence: 0.90
+  description: >
+    A process running from a Temp directory path also allocated a
+    memory region independently flagged by Volatility's own malfind
+    heuristics. This corroborates two independent signal types --
+    staging location and memory behavior -- on the same process,
+    without requiring a multi-node compound pattern: both conditions
+    are checked on the two ends of a single ALLOCATES edge, which the
+    existing source/target attribute-matching mechanism already
+    supports. Confidence set above code_injection_malfind_flagged's
+    0.85 alone, since two independent corroborating signal types is
+    stronger evidence than either alone; not yet validated against a
+    labeled corpus (see paper's Preliminary Real-World Observations
+    and Limitations sections). Directly motivated by a verified real
+    finding: every prior Code Injection false positive in this
+    codebase's testing (MsMpEng.exe, SearchApp.exe, smartscreen.exe,
+    OneDrive.exe) ran from a legitimate system path, not Temp -- this
+    rule is an untested hypothesis that path corroboration may succeed
+    where malfind corroboration alone did not (see
+    code_injection_malfind_flagged above).
+
+- id: execution_encoded_powershell
+  edge_type: SPAWNS
+  target_attr_patterns:
+    command_line: '(?i)(-enc|-EncodedCommand)'
+  produces: Execution
+  confidence: 0.7
+  description: >
+    A process spawned a child process (commonly powershell.exe) with a
+    base64-encoded command line, a common technique to obscure the
+    executed script from casual inspection.
+
+- id: webdav_rundll32_remote_execution
+  edge_type: SPAWNS
+  target_attr_patterns:
+    command_line: '(?i)net\s+use.*@\d+.*davwwwroot.*rundll32'
+  produces: Execution
+  confidence: 0.90
+  description: >
+    A process spawned a child mounting a remote WebDAV share (net use
+    \\IP@PORT\davwwwroot\) and executing a DLL directly from it via
+    rundll32 -- a known technique for remote code execution that
+    avoids writing the payload to local disk. High confidence: this
+    specific command pattern (WebDAV mount immediately followed by
+    rundll32 loading a DLL from that same remote path) has essentially
+    no legitimate use case. Confirmed against a real command line from
+    a second real memory image (pstree's "Audit" column, not yet
+    otherwise identified/attributed in this codebase beyond the raw
+    command line itself). Deliberately kept separate from
+    execution_encoded_powershell rather than merged into it: this
+    command line is not base64-encoded, and folding an unrelated
+    pattern into a rule named for encoding would make that rule's name
+    inaccurate and risk diluting its calibration for other, genuinely
+    encoded cases.

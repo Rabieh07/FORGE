@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+
+# Test / tooling
+.pytest_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# --- Forensic evidence: never commit real case data ---
+# Memory images (raw, vmem, dmp, etc.) and anything derived from a
+# real investigation must never be committed. Sample/test images
+# belong in an external, documented download step -- see README.
+*.raw
+*.vmem
+*.dmp
+*.mem
+/data/
+/images/
+/evidence/
+
+# Pipeline outputs (graph JSON, reports) -- regenerate, don't commit
+*.graph.json
+graph_output.json
+reports/
+
+# Secrets
+.env
+*.key

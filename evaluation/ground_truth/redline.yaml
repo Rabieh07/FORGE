@@ -1,0 +1,59 @@
+# Ground truth for RQ1 (recall only -- see paper's RQ1 methodology note
+# on why precision is reported as qualitative discussion instead, in
+# Section V.A, not computed here).
+#
+# Source: https://hackmd.io/@0xF4y3d/H1swlgyTA (CyberDefenders "106-redline"
+# challenge writeup)
+#
+# Each item is one confirmed-malicious finding this image's public
+# writeup independently establishes. "detected" means: does FORGE's
+# actual output contain an evidence_for edge from the named process to
+# a behavior node matching expected_behavior. This is NOT a full
+# ground-truth labeling of every process on the image -- see the
+# paper's RQ1 methodology note on why precision is not computed from
+# this file.
+
+image_name: "106-redline (CyberDefenders)"
+source_url: "https://hackmd.io/@0xF4y3d/H1swlgyTA"
+malware_family: "RedLine Stealer"
+
+items:
+  - description: "Anomalous/injected memory region in the malicious dropper"
+    process_name: "oneetx.exe"
+    process_pid: 5896
+    expected_behavior: "Code Injection"
+    mitre_technique: null  # writeup does not cite a specific technique ID for this
+    notes: >
+      Writeup confirms an RWX memory region at 0x400000 (the default
+      Windows EXE image base) via malfind, consistent with process
+      hollowing or manual PE mapping.
+
+  - description: "Dropper spawns rundll32.exe (execution handoff)"
+    process_name: "oneetx.exe"
+    process_pid: 5896
+    expected_behavior: null  # no current rule models "spawns a specific LOLBin" as its own behavior
+    mitre_technique: "T1218.011"  # Signed Binary Proxy Execution: Rundll32 -- same technique as Reveal
+    notes: >
+      Writeup confirms oneetx.exe spawns rundll32.exe. FORGE currently
+      has no rule keying specifically on "spawns rundll32" the way
+      webdav_rundll32_remote_execution does for Reveal's command-line
+      pattern -- this item is expected to be UNDETECTED under the
+      current rule set and is included for that reason: an honest
+      recall denominator should include known misses, not only cases
+      already covered by an existing rule.
+
+  - description: "Outbound connection to the malware's C2 server"
+    process_name: "oneetx.exe"
+    process_pid: 5896
+    expected_behavior: "Command and Control"
+    mitre_technique: "T1071"  # Application Layer Protocol (general C2 category; writeup does not cite a sub-technique)
+    notes: >
+      Writeup confirms a connection to 77.91.124.20:80, identified via
+      VirusTotal as RedLine Stealer infrastructure. FORGE's only C2
+      rule (c2_encoded_cmdline_and_connection) requires an encoded
+      PowerShell command line on the connecting process; oneetx.exe's
+      command line does not contain one (this is not a PowerShell-based
+      attack), so this item is expected to be UNDETECTED under the
+      current rule set -- a known, already-documented limitation (see
+      paper Section V.A on the C2 rule's PowerShell-specific
+      corroboration requirement).

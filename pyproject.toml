@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "forge"
+version = "0.1.0"
+description = "FORGE (Forensic Ontology-based Reasoning over Graph Evidence): an explainable knowledge-graph framework for LLM-assisted memory forensics."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { file = "LICENSE" }
+authors = [
+    { name = "Khaled Rabieh", email = "rabieh07@gmail.com" },
+]
+classifiers = [
+    "License :: OSI Approved :: Apache Software License",
+]
+dependencies = [
+    "networkx>=3.0",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+volatility = ["volatility3>=2.5.0"]
+anthropic = ["anthropic>=0.30.0"]
+dev = ["pytest>=7.0"]
+
+[tool.setuptools.packages.find]
+include = ["forge*"]

@@ -1,0 +1,21 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "FORGE: A Forensic Ontology-based Reasoning over Graph Evidence Tool for Memory Forensics"
+authors:
+  - family-names: Rabieh
+    given-names: Khaled
+    email: rabieh07@gmail.com
+    affiliation: "Department of Computer Science and Cybersecurity, Metropolitan State University"
+version: 0.1.0
+date-released: 2026-08-02
+license: Apache-2.0
+repository-code: "https://github.com/Rabieh07/FORGE"
+# preferred-citation:
+#   type: article
+#   title: "FORGE: A Forensic Ontology-based Reasoning over Graph Evidence Tool for Memory Forensics"
+#   authors:
+#     - family-names: Rabieh
+#       given-names: Khaled
+#   year: 2026
+#   # Fill in journal, DOI, and URL once the paper is accepted
+#   # and has a permanent identifier -- see README "Citation" section.
